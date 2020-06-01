@@ -1,0 +1,559 @@
+{
+	"info": {
+		"_postman_id": "5dbf7fb5-0911-4d78-bb62-8df447e2f5bd",
+		"name": "Example Requests",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Set up env vars",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "42187011-d308-4020-84e2-a5f8aa5e588c",
+						"exec": [
+							"pm.environment.set(\"anonymous_token\", '');",
+							"pm.environment.set(\"app_id\", ''); // app_key_web OR app_key_mobile",
+							"pm.environment.set(\"current-access-token\", '');",
+							"pm.environment.set(\"fuel-saver-card-identifier\", '');",
+							"pm.environment.set('private_key', ''); // private_key",
+							"pm.environment.set('public_key', ''); // public_key",
+							"pm.environment.set(\"oauth_nonce\", '');",
+							"pm.environment.set(\"oauth_signature\", '');",
+							"pm.environment.set(\"oauth_timestamp\", '');",
+							"pm.environment.set('provider-base-url', 'https://client-apir.pdn.retaileriq.com');",
+							"pm.environment.set(\"provider-partner-key\", ''); //partner_key",
+							"pm.environment.set(\"provider-shared-secret\", ''); // partner_secret"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{provider-base-url}}",
+					"host": [
+						"{{provider-base-url}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Register User",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "938e7edb-a04d-47ba-8041-36c660aff3de",
+						"exec": [
+							"const method = pm.request.method",
+							"let body = pm.request.body && method === 'POST' ? pm.request.body.raw : '';",
+							"",
+							"let env_vars = {};",
+							"pm.environment.values.map(x => {",
+							"    env_vars[`{{${x.key}}}`] = x.value;",
+							"});",
+							"",
+							"const queryParams = pm.request.url.query;",
+							"const requestPath = pm.request.url.path;",
+							"",
+							"let path = '';",
+							"requestPath.map((x, i) => {",
+							"    path += i < requestPath.length - 1 ?",
+							"        x + '/':",
+							"        x + '?';",
+							"});",
+							"",
+							"let query = '';",
+							"queryParams.map((x, i) => {",
+							"    let value = env_vars[x.value] ? env_vars[x.value] : x.value;",
+							"",
+							"    query += i < queryParams.count() - 1 ?",
+							"        x.key + '=' + value + '&':",
+							"        x.key + '=' + value;",
+							"});",
+							"",
+							"const oauthTimestamp = Math.round(new Date().getTime() / 1000);",
+							"",
+							"const secret = pm.environment.get('private_key');",
+							"const crypto = require('crypto-js');",
+							"const message = `${path}${query}${method}${oauthTimestamp}${body}`;",
+							"",
+							"const oauthSignature = crypto.enc.Base64.stringify(crypto.HmacSHA256(message, secret));",
+							"",
+							"const nonce = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);",
+							"",
+							"pm.environment.set(\"oauth_nonce\", nonce);",
+							"pm.environment.set(\"oauth_signature\", oauthSignature);",
+							"pm.environment.set(\"oauth_timestamp\", oauthTimestamp);",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "oauth_signature",
+						"value": "{{oauth_signature}}",
+						"type": "text"
+					},
+					{
+						"key": "oauth_nonce",
+						"value": "{{oauth_nonce}}",
+						"type": "text"
+					},
+					{
+						"key": "oauth_consumer_key",
+						"value": "{{public_key}}",
+						"type": "text"
+					},
+					{
+						"key": "oauth_version",
+						"value": "2.0",
+						"type": "text"
+					},
+					{
+						"key": "oauth_signature_method",
+						"value": "HMAC-SHA256",
+						"type": "text"
+					},
+					{
+						"key": "oauth_timestamp",
+						"value": "{{oauth_timestamp}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{ \"userCode\":\"432\", \"loyaltyNumber\":\"456\", \"address\": { \"zip\":\"12345\" } }",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{provider-base-url}}/user/register?p={{provider-partner-key}}&s={{provider-shared-secret}}&a={{app_id}}",
+					"host": [
+						"{{provider-base-url}}"
+					],
+					"path": [
+						"user",
+						"register"
+					],
+					"query": [
+						{
+							"key": "p",
+							"value": "{{provider-partner-key}}"
+						},
+						{
+							"key": "s",
+							"value": "{{provider-shared-secret}}"
+						},
+						{
+							"key": "a",
+							"value": "{{app_id}}"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Access Token For User",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "32f500d7-bba5-4599-ae95-be3a04524cda",
+						"exec": [
+							"var jsonData = JSON.parse(responseBody);",
+							"pm.environment.set(\"current-access-token\", jsonData.access_token);"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "b57f5aa5-b25c-40cf-91b6-1defd87a4256",
+						"exec": [
+							"const method = pm.request.method",
+							"let body = pm.request.body && method === 'POST' ? pm.request.body.raw : '';",
+							"",
+							"let env_vars = {};",
+							"pm.environment.values.map(x => {",
+							"    env_vars[`{{${x.key}}}`] = x.value;",
+							"});",
+							"",
+							"const queryParams = pm.request.url.query;",
+							"const requestPath = pm.request.url.path;",
+							"",
+							"let path = '';",
+							"requestPath.map((x, i) => {",
+							"    path += i < requestPath.length - 1 ?",
+							"        x + '/':",
+							"        x + '?';",
+							"});",
+							"",
+							"let query = '';",
+							"queryParams.map((x, i) => {",
+							"    let value = env_vars[x.value] ? env_vars[x.value] : x.value;",
+							"",
+							"    query += i < queryParams.count() - 1 ?",
+							"        x.key + '=' + value + '&':",
+							"        x.key + '=' + value;",
+							"});",
+							"",
+							"const oauthTimestamp = Math.round(new Date().getTime() / 1000);",
+							"",
+							"const secret = pm.environment.get('private_key');",
+							"const crypto = require('crypto-js');",
+							"const message = `${path}${query}${method}${oauthTimestamp}${body}`;",
+							"",
+							"const oauthSignature = crypto.enc.Base64.stringify(crypto.HmacSHA256(message, secret));",
+							"",
+							"const nonce = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);",
+							"",
+							"pm.environment.set(\"oauth_nonce\", nonce);",
+							"pm.environment.set(\"oauth_signature\", oauthSignature);",
+							"pm.environment.set(\"oauth_timestamp\", oauthTimestamp);",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "oauth_signature",
+						"value": "{{oauth_signature}}",
+						"type": "text"
+					},
+					{
+						"key": "oauth_nonce",
+						"value": "{{oauth_nonce}}",
+						"type": "text"
+					},
+					{
+						"key": "oauth_consumer_key",
+						"value": "{{public_key}}",
+						"type": "text"
+					},
+					{
+						"key": "oauth_version",
+						"value": "2.0",
+						"type": "text"
+					},
+					{
+						"key": "oauth_signature_method",
+						"value": "HMAC-SHA256",
+						"type": "text"
+					},
+					{
+						"key": "oauth_timestamp",
+						"value": "{{oauth_timestamp}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{provider-base-url}}/user/token?p={{provider-partner-key}}&s={{provider-shared-secret}}&u={{fuel-saver-card-identifier}}&ut=loyaltynumber",
+					"host": [
+						"{{provider-base-url}}"
+					],
+					"path": [
+						"user",
+						"token"
+					],
+					"query": [
+						{
+							"key": "p",
+							"value": "{{provider-partner-key}}",
+							"description": "client identifier key"
+						},
+						{
+							"key": "s",
+							"value": "{{provider-shared-secret}}",
+							"description": "shared secret"
+						},
+						{
+							"key": "u",
+							"value": "{{fuel-saver-card-identifier}}",
+							"description": "fuel saver identifier (for anonymous user use anonymous)"
+						},
+						{
+							"key": "ut",
+							"value": "loyaltynumber",
+							"description": "user identifier type allowed values: usercode, phone, email address, loyaltynumber  (default value is usercode)"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get User Profile",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "74e7b175-446b-461c-9de2-0b87c0794c45",
+						"exec": [
+							"const method = pm.request.method",
+							"const body = pm.request.body && method === 'POST' ? pm.request.body.raw : '';",
+							"",
+							"let env_vars = {};",
+							"pm.environment.values.map(x => {",
+							"    env_vars[`{{${x.key}}}`] = x.value;",
+							"});",
+							"",
+							"const queryParams = pm.request.url.query;",
+							"const requestPath = pm.request.url.path;",
+							"",
+							"let path = '';",
+							"requestPath.map((x, i) => {",
+							"    path += i < requestPath.length - 1 ?",
+							"        x + '/':",
+							"        x + '?';",
+							"});",
+							"",
+							"let query = '';",
+							"queryParams.map((x, i) => {",
+							"    let value = env_vars[x.value] ? env_vars[x.value] : x.value;",
+							"",
+							"    query += i < queryParams.count() - 1 ?",
+							"        x.key + '=' + value + '&':",
+							"        x.key + '=' + value;",
+							"});",
+							"",
+							"const oauthTimestamp = Math.round(new Date().getTime() / 1000);",
+							"",
+							"const secret = pm.environment.get('private_key');",
+							"const crypto = require('crypto-js');",
+							"const message = `${path}${query}${method}${oauthTimestamp}${body}`;",
+							"",
+							"const oauthSignature = crypto.enc.Base64.stringify(crypto.HmacSHA256(message, secret));",
+							"",
+							"const nonce = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);",
+							"",
+							"pm.environment.set(\"oauth_nonce\", nonce);",
+							"pm.environment.set(\"oauth_signature\", oauthSignature);",
+							"pm.environment.set(\"oauth_timestamp\", oauthTimestamp);",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					},
+					{
+						"key": "oauth_signature",
+						"value": "{{oauth_signature}}",
+						"type": "text"
+					},
+					{
+						"key": "oauth_timestamp",
+						"value": "{{oauth_timestamp}}",
+						"type": "text"
+					},
+					{
+						"key": "oauth_nonce",
+						"value": "{{oauth_nonce}}",
+						"type": "text"
+					},
+					{
+						"key": "oauth_consumer_key",
+						"value": "{{public_key}}",
+						"type": "text"
+					},
+					{
+						"key": "oauth_version",
+						"value": "2.0",
+						"type": "text"
+					},
+					{
+						"key": "oauth_signature_method",
+						"value": "HMAC-SHA256",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{provider-base-url}}/user/profile?t={{current-access-token}}&a={{app_id}}&d=true",
+					"host": [
+						"{{provider-base-url}}"
+					],
+					"path": [
+						"user",
+						"profile"
+					],
+					"query": [
+						{
+							"key": "t",
+							"value": "{{current-access-token}}",
+							"description": "access token"
+						},
+						{
+							"key": "a",
+							"value": "{{app_id}}",
+							"description": "app Id"
+						},
+						{
+							"key": "d",
+							"value": "true"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update User Profile",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "5594265a-96cc-4fe4-9553-a164f595f9f5",
+						"exec": [
+							"const method = pm.request.method",
+							"const body = pm.request.body && method === 'POST' ? pm.request.body.raw : '';",
+							"",
+							"let env_vars = {};",
+							"pm.environment.values.map(x => {",
+							"    env_vars[`{{${x.key}}}`] = x.value;",
+							"});",
+							"",
+							"const queryParams = pm.request.url.query;",
+							"const requestPath = pm.request.url.path;",
+							"",
+							"let path = '';",
+							"requestPath.map((x, i) => {",
+							"    path += i < requestPath.length - 1 ?",
+							"        x + '/':",
+							"        x + '?';",
+							"});",
+							"",
+							"let query = '';",
+							"queryParams.map((x, i) => {",
+							"    let value = env_vars[x.value] ? env_vars[x.value] : x.value;",
+							"",
+							"    query += i < queryParams.count() - 1 ?",
+							"        x.key + '=' + value + '&':",
+							"        x.key + '=' + value;",
+							"});",
+							"",
+							"const oauthTimestamp = Math.round(new Date().getTime() / 1000);",
+							"",
+							"const secret = pm.environment.get('private_key');",
+							"const crypto = require('crypto-js');",
+							"const message = `${path}${query}${method}${oauthTimestamp}${body}`;",
+							"",
+							"const oauthSignature = crypto.enc.Base64.stringify(crypto.HmacSHA256(message, secret));",
+							"",
+							"const nonce = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);",
+							"",
+							"pm.environment.set(\"oauth_nonce\", nonce);",
+							"pm.environment.set(\"oauth_signature\", oauthSignature);",
+							"pm.environment.set(\"oauth_timestamp\", oauthTimestamp);",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					},
+					{
+						"key": "oauth_signature",
+						"type": "text",
+						"value": "{{oauth_signature}}"
+					},
+					{
+						"key": "oauth_timestamp",
+						"type": "text",
+						"value": "{{oauth_timestamp}}"
+					},
+					{
+						"key": "oauth_nonce",
+						"type": "text",
+						"value": "{{oauth_nonce}}"
+					},
+					{
+						"key": "oauth_consumer_key",
+						"type": "text",
+						"value": "{{public_key}}"
+					},
+					{
+						"key": "oauth_version",
+						"type": "text",
+						"value": "2.0"
+					},
+					{
+						"key": "oauth_signature_method",
+						"type": "text",
+						"value": "HMAC-SHA256"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"phoneNumber\": \"5552225555\",\n  \"email\": \"fairy.faire@mysticalmail.com\",\n  \"firstName\": \"Fairy\",\n  \"lastName\": \"Faire\",\n  \"optin\": \"prompt\",\n  \"printReceiptAtPOS\": \"yes\",\n  \"address\": {\n    \"address1\": \"3434 34th Street\",\n    \"address2\": \"Apt 34\",\n    \"city\": \"Streetville\",\n    \"state\": \"KS\",\n    \"zip\": \"34343\"\n  },\n  \"deliveryPreference\": [\n    {\n      \"deliveryType\": \"sms\",\n      \"deliveryValue\": \"5552225555\",\n      \"isPreferred\": \"yes\"\n    }\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{provider-base-url}}/user/profile?t={{current-access-token}}&a={{app_id}}",
+					"host": [
+						"{{provider-base-url}}"
+					],
+					"path": [
+						"user",
+						"profile"
+					],
+					"query": [
+						{
+							"key": "t",
+							"value": "{{current-access-token}}",
+							"description": "access token"
+						},
+						{
+							"key": "a",
+							"value": "{{app_id}}",
+							"description": "app Id"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"protocolProfileBehavior": {}
+}
